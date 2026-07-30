@@ -7,7 +7,7 @@
     "default_title": "Capture job posting",
     "default_popup": "popup.html"
   },
-  "permissions": ["activeTab", "scripting", "clipboardWrite"],
+  "permissions": ["activeTab", "scripting", "clipboardWrite", "storage"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "service-worker.js"

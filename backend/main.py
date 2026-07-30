@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 from sqlmodel import Session, select
@@ -12,6 +13,13 @@ from pathlib import Path
 
 
 app = FastAPI(title="Job Tracker API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 engine = get_engine()
 create_db_and_tables(engine)
 
@@ -179,3 +187,40 @@ def list_apps():
     with Session(engine) as session:
         apps = session.exec(select(Application)).all()
         return {"ok": True, "applications": [a.dict() for a in apps]}
+
+
+@app.post("/apps")
+def create_app(item: dict):
+    # accept a single application payload and persist it
+    try:
+        normalized = {
+            "company": item.get("company", "").strip(),
+            "position": item.get("position", "").strip(),
+            "location": item.get("location", "").strip(),
+            "link": item.get("link", "").strip(),
+            "salary": item.get("salary", "").strip(),
+            "source_site": item.get("sourceSite", item.get("source_site", "")).strip(),
+            "date_applied": item.get("dateApplied", item.get("date_applied")),
+            "stage": item.get("stage", "Applied"),
+            "notes": item.get("notes", ""),
+        }
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
+    with Session(engine) as session:
+        app_obj = Application(
+            company=normalized["company"],
+            position=normalized["position"],
+            location=normalized["location"],
+            link=normalized["link"],
+            salary=normalized["salary"],
+            source_site=normalized["source_site"],
+            date_applied=normalized["date_applied"],
+            stage=normalized["stage"],
+            notes=normalized["notes"],
+        )
+        session.add(app_obj)
+        session.commit()
+        session.refresh(app_obj)
+
+    return JSONResponse({"ok": True, "application": app_obj.dict()})
