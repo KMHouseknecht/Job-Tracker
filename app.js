@@ -167,7 +167,37 @@ importCaptureButton.addEventListener("click", () => {
 });
 
 bulkImportButton.addEventListener("click", () => {
-  const report = importAppliedJobs(bulkImportInput.value);
+  handleBulkImport();
+});
+
+async function handleBulkImport() {
+  const raw = bulkImportInput.value || "";
+  const urls = (raw || "").match(/https?:\/\/[^\s]+/g) || [];
+
+  let fetchedJobs = [];
+  const backendUrl = getBackendUrl();
+  if (urls.length && backendUrl) {
+    try {
+      fetchedJobs = await fetchJobsFromBackend(urls);
+    } catch (err) {
+      bulkImportResult.innerHTML = `<strong>Error fetching URLs:</strong> ${escapeHtml(err.message || String(err))}`;
+      return;
+    }
+  } else if (urls.length && !backendUrl) {
+    bulkImportResult.innerHTML = '<strong>URL import requires a backend.</strong> Set the Backend URL above and try again.';
+    return;
+  }
+
+  // Merge fetched jobs into a single raw text blob as JSON blocks so parser can handle them
+  let combinedRaw = raw;
+  if (fetchedJobs.length) {
+    const jsonBlocks = fetchedJobs
+      .map((j) => JSON.stringify(j, null, 2))
+      .join("\n\n");
+    combinedRaw = `${jsonBlocks}\n\n${raw}`.trim();
+  }
+
+  const report = importAppliedJobs(combinedRaw);
   bulkImportResult.innerHTML = report.html;
   if (report.added) {
     persist();
@@ -877,6 +907,34 @@ function normalizeAppliedJob(payload) {
     stage: normalized.stage || "Applied",
     dateApplied: normalized.dateApplied || new Date().toISOString().slice(0, 10),
   };
+}
+
+async function fetchJobsFromBackend(urls) {
+  const backendUrl = getBackendUrl();
+  if (!backendUrl) throw new Error("No backend configured");
+
+  const response = await fetch(new URL("/fetch-jobs", backendUrl).toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ urls }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Backend responded with ${response.status}`);
+  }
+
+  const body = await response.json();
+  if (!body || !Array.isArray(body.jobs)) {
+    throw new Error("Invalid response from backend");
+  }
+
+  // Map backend job entries to normalized applied job objects
+  const jobs = body.jobs
+    .filter((entry) => entry && entry.ok && entry.job)
+    .map((entry) => normalizeAppliedJob(entry.job))
+    .filter(Boolean);
+
+  return jobs;
 }
 
 function pickLocation(values) {

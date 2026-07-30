@@ -7,6 +7,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+import re
+import urllib.request
+from html import unescape
 
 
 ROOT = Path(__file__).resolve().parent
@@ -101,6 +104,35 @@ class JobTrackerHandler(BaseHTTPRequestHandler):
         json_response(self, HTTPStatus.NOT_FOUND, {"ok": False, "error": "Not found"})
 
     def do_POST(self) -> None:  # noqa: N802
+        if self.path == "/fetch-jobs":
+            try:
+                content_length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                content_length = 0
+
+            raw_body = self.rfile.read(content_length).decode("utf-8") if content_length else ""
+            try:
+                payload = json.loads(raw_body) if raw_body else {}
+            except json.JSONDecodeError:
+                json_response(self, HTTPStatus.BAD_REQUEST, {"ok": False, "error": "Request body must be valid JSON."})
+                return
+
+            urls = payload.get("urls") if isinstance(payload, dict) else None
+            if not isinstance(urls, list):
+                json_response(self, HTTPStatus.BAD_REQUEST, {"ok": False, "error": "Payload must include urls[] list."})
+                return
+
+            jobs = []
+            for url in urls:
+                try:
+                    job = fetch_and_parse_job(url)
+                    jobs.append({"ok": True, "url": url, "job": job})
+                except Exception as exc:  # pragma: no cover - best-effort parsing
+                    jobs.append({"ok": False, "url": url, "error": str(exc)})
+
+            json_response(self, HTTPStatus.OK, {"ok": True, "jobs": jobs})
+            return
+
         if self.path != "/sync":
             json_response(self, HTTPStatus.NOT_FOUND, {"ok": False, "error": "Not found"})
             return
@@ -165,6 +197,127 @@ class JobTrackerHandler(BaseHTTPRequestHandler):
                 "historyCount": len(history),
             },
         )
+
+
+def fetch_url_text(url: str, timeout: int = 10) -> str:
+    req = urllib.request.Request(url, headers={"User-Agent": "JobTrackerBot/1.0 (+https://example.com)"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        content_type = resp.headers.get("Content-Type", "")
+        raw = resp.read()
+        # Attempt to decode using charset if provided
+        m = re.search(r"charset=([^;]+)", content_type, re.I)
+        if m:
+            try:
+                return raw.decode(m.group(1).strip(), errors="replace")
+            except Exception:
+                pass
+        for enc in ("utf-8", "windows-1252", "iso-8859-1"):
+            try:
+                return raw.decode(enc, errors="replace")
+            except Exception:
+                continue
+        return raw.decode("utf-8", errors="replace")
+
+
+def first_meta(html: str, names: list[str]) -> str | None:
+    for name in names:
+        # property or name
+        m = re.search(rf'<meta[^>]+(?:property|name)=["\']{re.escape(name)}["\'][^>]*content=["\']([^"\']+)["\']', html, re.I)
+        if m:
+            return unescape(m.group(1).strip())
+    return None
+
+
+def extract_json_ld(html: str) -> list[dict]:
+    items: list[dict] = []
+    for m in re.finditer(r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>([\s\S]*?)</script>', html, re.I):
+        try:
+            data = json.loads(m.group(1))
+            if isinstance(data, list):
+                items.extend(data)
+            else:
+                items.append(data)
+        except Exception:
+            continue
+    return items
+
+
+def strip_tags(text: str, limit: int = 1400) -> str:
+    text = re.sub(r"<script[\s\S]*?</script>", "", text, flags=re.I)
+    text = re.sub(r"<style[\s\S]*?</style>", "", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return unescape(text)[:limit]
+
+
+def fetch_and_parse_job(url: str) -> dict[str, str]:
+    html = fetch_url_text(url)
+
+    # title
+    title = first_meta(html, ["og:title", "twitter:title", "title"]) or ""
+    if not title:
+        m = re.search(r"<title>([\s\S]*?)</title>", html, re.I)
+        if m:
+            title = unescape(m.group(1).strip())
+
+    # description
+    description = first_meta(html, ["og:description", "twitter:description", "description"]) or ""
+    if not description:
+        # fallback to first meaningful paragraph
+        m = re.search(r"<p[^>]*>([\s\S]*?)</p>", html, re.I)
+        if m:
+            description = strip_tags(m.group(1), 800)
+
+    # JSON-LD hints
+    jsonlds = extract_json_ld(html)
+    company = ""
+    location = ""
+    salary = ""
+    for item in jsonlds:
+        if isinstance(item, dict):
+            if not company:
+                org = item.get("hiringOrganization") or item.get("employer")
+                if isinstance(org, dict):
+                    company = org.get("name") or company
+                elif isinstance(org, str):
+                    company = org or company
+
+            if not location:
+                jl = item.get("jobLocation") or item.get("jobLocationType")
+                if isinstance(jl, dict):
+                    addr = jl.get("address") or {}
+                    if isinstance(addr, dict):
+                        location = addr.get("addressLocality") or addr.get("addressRegion") or location
+
+            if not salary:
+                base = item.get("baseSalary")
+                if isinstance(base, dict):
+                    try:
+                        if isinstance(base.get("value"), dict):
+                            minv = base["value"].get("minValue")
+                            maxv = base["value"].get("maxValue")
+                            if minv and maxv:
+                                salary = f"${minv}-{maxv}"
+                    except Exception:
+                        pass
+
+    # fallback company from site
+    if not company:
+        company = first_meta(html, ["og:site_name", "application-name"]) or re.sub(r"https?://(www\.)?", "", url).split("/")[0]
+
+    position = title or ""
+
+    return {
+        "company": (company or "").strip(),
+        "position": (position or "").strip(),
+        "location": (location or "").strip(),
+        "salary": (salary or "").strip(),
+        "link": url,
+        "sourceSite": re.sub(r"https?://(www\.)?", "", url).split("/")[0],
+        "dateApplied": datetime.now(timezone.utc).date().isoformat(),
+        "stage": "Applied",
+        "notes": (description or "").strip(),
+    }
 
 
 def main() -> None:
