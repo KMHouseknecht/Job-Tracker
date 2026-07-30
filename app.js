@@ -25,6 +25,7 @@ const bulkImportInput = document.getElementById("bulkImportInput");
 const bulkImportButton = document.getElementById("bulkImportButton");
 const bulkImportSampleButton = document.getElementById("bulkImportSampleButton");
 const bulkImportResult = document.getElementById("bulkImportResult");
+const forceImportDuplicatesCheckbox = document.getElementById("forceImportDuplicates");
 const backendUrlInput = document.getElementById("backendUrlInput");
 const syncNowButton = document.getElementById("syncNowButton");
 const clearBackendButton = document.getElementById("clearBackendButton");
@@ -197,7 +198,8 @@ async function handleBulkImport() {
     combinedRaw = `${jsonBlocks}\n\n${raw}`.trim();
   }
 
-  const report = importAppliedJobs(combinedRaw);
+  const force = forceImportDuplicatesCheckbox && forceImportDuplicatesCheckbox.checked;
+  const report = importAppliedJobs(combinedRaw, { forceDuplicates: !!force });
   bulkImportResult.innerHTML = report.html;
   if (report.added) {
     persist();
@@ -782,7 +784,7 @@ function normalizeCapturePayload(payload) {
   };
 }
 
-function importAppliedJobs(rawText) {
+function importAppliedJobs(rawText, options = {}) {
   const text = rawText.trim();
   if (!text) {
     return {
@@ -802,13 +804,14 @@ function importAppliedJobs(rawText) {
   let added = 0;
   let skipped = 0;
 
+  const force = !!options.forceDuplicates;
   parsed.forEach((candidate) => {
     if (!candidate.company || !candidate.position) {
       skipped += 1;
       return;
     }
 
-    if (applications.some((application) => isDuplicateApplication(application, candidate))) {
+    if (!force && applications.some((application) => isDuplicateApplication(application, candidate))) {
       skipped += 1;
       return;
     }
