@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Job Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="backdrop backdrop-one"></div>
+    <div class="backdrop backdrop-two"></div>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Job Application Ops</p>
+          <h1>Track every application, status change, and inbox signal in one place.</h1>
+          <p class="lede">
+            Capture roles from any site, auto-mark applications as Ghosted after 14 days without movement, and translate email updates into status changes you can review.
+          </p>
+        </div>
+        <div class="hero-card">
+          <div class="hero-card-top">
+            <span>Health</span>
+            <strong id="lastSyncLabel">Ready</strong>
+          </div>
+          <div class="hero-card-grid">
+            <div>
+              <span>Open</span>
+              <strong id="openCount">0</strong>
+            </div>
+            <div>
+              <span>Ghosted</span>
+              <strong id="ghostedCount">0</strong>
+            </div>
+            <div>
+              <span>Interviews</span>
+              <strong id="interviewCount">0</strong>
+            </div>
+            <div>
+              <span>Offers</span>
+              <strong id="offerCount">0</strong>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="panel grid-two">
+        <form id="applicationForm" class="card form-card">
+          <div class="card-heading">
+            <div>
+              <p class="section-kicker">Quick add</p>
+              <h2>Add or update an application</h2>
+            </div>
+            <button type="button" id="seedButton" class="secondary">Load sample data</button>
+          </div>
+
+          <div class="form-grid">
+            <label>
+              Company
+              <input name="company" required placeholder="Acme Labs" />
+            </label>
+            <label>
+              Position
+              <input name="position" required placeholder="Senior Product Designer" />
+            </label>
+            <label>
+              Location
+              <input name="location" placeholder="Remote / New York" />
+            </label>
+            <label>
+              Job link
+              <input name="link" type="url" placeholder="https://..." />
+            </label>
+            <label>
+              Salary
+              <input name="salary" placeholder="$140k-$170k" />
+            </label>
+            <label>
+              Source site
+              <input name="sourceSite" placeholder="LinkedIn, Greenhouse, company site" />
+            </label>
+            <label>
+              Date applied
+              <input name="dateApplied" type="date" required />
+            </label>
+            <label>
+              Current stage
+              <select name="stage">
+                <option>Applied</option>
+                <option>Screening</option>
+                <option>Interviewing</option>
+                <option>Offer</option>
+                <option>Rejected</option>
+                <option>Ghosted</option>
+                <option>Withdrawn</option>
+              </select>
+            </label>
+            <label>
+              Interview date
+              <input name="interviewDate" type="date" />
+            </label>
+            <label>
+              Recruiter
+              <input name="recruiter" placeholder="Name or email" />
+            </label>
+            <label>
+              Priority
+              <select name="priority">
+                <option>High</option>
+                <option selected>Medium</option>
+                <option>Low</option>
+              </select>
+            </label>
+            <label>
+              Tags
+              <input name="tags" placeholder="frontend, design, referral" />
+            </label>
+            <label class="wide">
+              Notes
+              <textarea name="notes" rows="3" placeholder="Anything relevant: recruiter response, application quirks, follow-up plan"></textarea>
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="primary" id="submitButton">Add application</button>
+            <button type="button" id="resetButton" class="ghost">Clear</button>
+          </div>
+        </form>
+
+        <aside class="stack">
+          <section class="card">
+            <div class="card-heading compact">
+              <div>
+                <p class="section-kicker">Capture plugin</p>
+                <h2>Grab posting details from any job page</h2>
+              </div>
+              <span class="pill">Bookmarklet</span>
+            </div>
+            <p class="text-muted">
+              Drag or copy the bookmarklet below, run it on a job posting page, then paste the generated payload here to prefill the tracker.
+            </p>
+            <label>
+              Bookmarklet
+              <textarea id="bookmarkletOutput" rows="4" readonly></textarea>
+            </label>
+            <div class="form-actions tight">
+              <button type="button" id="copyBookmarkletButton" class="secondary">Copy bookmarklet</button>
+              <button type="button" id="fillFromPayloadButton" class="ghost">Paste sample payload</button>
+            </div>
+            <label>
+              Capture payload
+              <textarea id="captureInput" rows="6" placeholder="Paste JSON copied from the bookmarklet here."></textarea>
+            </label>
+            <div class="form-actions tight">
+              <button type="button" id="importCaptureButton" class="primary">Import to form</button>
+              <span id="captureResult" class="status-text">Waiting for captured job data.</span>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-heading compact">
+              <div>
+                <p class="section-kicker">Bulk import</p>
+                <h2>Add jobs from your applied list</h2>
+              </div>
+              <span class="pill">Indeed-ready</span>
+            </div>
+            <p class="text-muted">
+              Paste copied text from an Indeed Applied jobs list, CSV export, or any multi-line job list. The parser will turn each block into a tracker entry and skip duplicates.
+            </p>
+            <label>
+              Applied jobs list
+              <textarea id="bulkImportInput" rows="8" placeholder="Paste your applied jobs list here. Example:\nNorthstar Studio\nProduct Designer\nRemote\n2026-07-24\n\nTrailhead Systems\nFrontend Engineer\nNew York, NY"></textarea>
+            </label>
+            <div class="form-actions tight">
+              <button type="button" id="bulkImportButton" class="primary">Import applied jobs</button>
+              <button type="button" id="bulkImportSampleButton" class="ghost">Insert sample list</button>
+            </div>
+            <div id="bulkImportResult" class="insight-box">No applied-job list imported yet.</div>
+          </section>
+
+          <section class="card">
+            <div class="card-heading compact">
+              <div>
+                <p class="section-kicker">Backend sync</p>
+                <h2>Push applications to your API</h2>
+              </div>
+              <span class="pill">Sync queue</span>
+            </div>
+            <p class="text-muted">
+              Set a backend endpoint and the tracker will sync the full application list after each change. This keeps the local prototype and your future database aligned.
+            </p>
+            <label>
+              Backend URL
+              <input id="backendUrlInput" type="url" placeholder="https://your-api.example.com" />
+            </label>
+            <div class="form-actions tight">
+              <button type="button" id="syncNowButton" class="secondary">Sync now</button>
+              <button type="button" id="clearBackendButton" class="ghost">Disable backend</button>
+            </div>
+            <div id="backendStatus" class="insight-box">No backend configured. Local storage only.</div>
+          </section>
+
+          <section class="card">
+            <div class="card-heading compact">
+              <div>
+                <p class="section-kicker">Automation</p>
+                <h2>Ghosting rule</h2>
+              </div>
+              <span class="pill">14 days</span>
+            </div>
+            <p class="text-muted">Applications with no update after 14 days are automatically marked Ghosted unless they are already in Interviewing, Offer, Rejected, or Withdrawn.</p>
+            <div class="inline-row">
+              <button type="button" id="runGhostingButton" class="secondary">Run upkeep now</button>
+              <span id="ghostingResult" class="status-text">No pending changes</span>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-heading compact">
+              <div>
+                <p class="section-kicker">Email skim</p>
+                <h2>Paste messages to classify</h2>
+              </div>
+              <span class="pill warm">Review-first</span>
+            </div>
+            <textarea id="emailInput" rows="8" placeholder="Paste email subject/body text here. Example: 'We'd like to invite you for an interview' or 'Unfortunately, we will not be moving forward.'"></textarea>
+            <div class="form-actions tight">
+              <button type="button" id="classifyEmailButton" class="primary">Classify message</button>
+              <button type="button" id="sampleEmailButton" class="ghost">Insert sample</button>
+            </div>
+            <div id="emailResult" class="insight-box">No email analyzed yet.</div>
+          </section>
+        </aside>
+      </section>
+
+      <section class="panel card">
+        <div class="card-heading compact wrap">
+          <div>
+            <p class="section-kicker">Applications</p>
+            <h2>Pipeline and history</h2>
+          </div>
+          <div class="filters">
+            <input id="searchInput" placeholder="Search company, role, notes, tags" />
+            <select id="stageFilter">
+              <option value="All">All stages</option>
+              <option>Applied</option>
+              <option>Screening</option>
+              <option>Interviewing</option>
+              <option>Offer</option>
+              <option>Rejected</option>
+              <option>Ghosted</option>
+              <option>Withdrawn</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Position</th>
+                <th>Stage</th>
+                <th>Applied</th>
+                <th>Interview</th>
+                <th>Location</th>
+                <th>Link</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="applicationTable"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

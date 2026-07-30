@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Job Tracker Capture</title>
+    <style>
+      body {
+        margin: 0;
+        width: 340px;
+        background: #07111d;
+        color: #eff4ff;
+        font-family: system-ui, sans-serif;
+      }
+      main {
+        padding: 16px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.1rem;
+      }
+      p {
+        color: #a2b1cc;
+        line-height: 1.5;
+      }
+      button {
+        width: 100%;
+        border: 0;
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-weight: 700;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      .primary {
+        background: linear-gradient(135deg, #80e3c4, #b5ffd6);
+        color: #05211a;
+      }
+      .secondary {
+        background: rgba(255, 255, 255, 0.08);
+        color: #eff4ff;
+      }
+      textarea {
+        width: 100%;
+        min-height: 160px;
+        margin-top: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        color: #eff4ff;
+        border: 1px solid rgba(165, 191, 255, 0.18);
+        border-radius: 12px;
+        padding: 10px;
+        box-sizing: border-box;
+      }
+      .status {
+        margin-top: 10px;
+        color: #a2b1cc;
+        font-size: 0.88rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Job Tracker Capture</h1>
+      <p>Capture posting details from the current tab and copy them as JSON.</p>
+      <button id="captureButton" class="primary">Capture job details</button>
+      <button id="copyButton" class="secondary">Copy JSON</button>
+      <textarea id="output" placeholder="Captured JSON appears here"></textarea>
+      <div id="status" class="status">Ready.</div>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

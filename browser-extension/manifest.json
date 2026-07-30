@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Job Tracker Capture",
+  "version": "1.0.0",
+  "description": "Capture job posting details from any job page and send them to Job Tracker.",
+  "action": {
+    "default_title": "Capture job posting",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["activeTab", "scripting", "clipboardWrite"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
