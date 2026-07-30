@@ -52,10 +52,13 @@ sendButton.addEventListener('click', async () => {
     // persist backend URL for convenience
     chrome.storage.local.set({ jobTrackerBackendUrl: backend }, () => {});
 
-    const res = await fetch(new URL('/apps', backend).toString(), {
+    // send as a snapshot replace (single-item applications array) so both
+    // the FastAPI and legacy stdlib backend can accept it via /sync
+    const payload = { applications: [json], history: [], syncedAt: new Date().toISOString() };
+    const res = await fetch(new URL('/sync', backend).toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(json),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
