@@ -104,6 +104,34 @@ class JobTrackerHandler(BaseHTTPRequestHandler):
         json_response(self, HTTPStatus.NOT_FOUND, {"ok": False, "error": "Not found"})
 
     def do_POST(self) -> None:  # noqa: N802
+        if self.path == "/apps":
+            try:
+                content_length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                content_length = 0
+
+            raw_body = self.rfile.read(content_length).decode("utf-8") if content_length else ""
+            try:
+                payload = json.loads(raw_body) if raw_body else {}
+            except json.JSONDecodeError:
+                json_response(self, HTTPStatus.BAD_REQUEST, {"ok": False, "error": "Request body must be valid JSON."})
+                return
+
+            if not isinstance(payload, dict):
+                json_response(self, HTTPStatus.BAD_REQUEST, {"ok": False, "error": "Expected an object for single application."})
+                return
+
+            store = load_store()
+            apps = store.get("applications", [])
+            apps.insert(0, payload)
+            store["applications"] = apps
+            store["applicationCount"] = len(apps)
+            store["syncedAt"] = utc_now()
+            write_store(store)
+
+            json_response(self, HTTPStatus.OK, {"ok": True, "applicationCount": len(apps)})
+            return
+
         if self.path == "/fetch-jobs":
             try:
                 content_length = int(self.headers.get("Content-Length", "0"))
