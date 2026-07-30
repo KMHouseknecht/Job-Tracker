@@ -39,6 +39,12 @@ let history = loadData(HISTORY_KEY, []);
 let syncQueue = loadData(SYNC_QUEUE_KEY, []);
 let editingId = null;
 
+// If no backend configured, default to local dev backend and persist it so the
+// UI and extension behave consistently for local testing.
+if (!getBackendUrl()) {
+  const defaultBackend = "http://127.0.0.1:8787";
+  localStorage.setItem(BACKEND_URL_KEY, defaultBackend);
+}
 backendUrlInput.value = getBackendUrl();
 updateBackendStatus();
 
